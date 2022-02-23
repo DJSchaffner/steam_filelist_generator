@@ -33,8 +33,6 @@ if __name__ == '__main__':
   if len(download_option) > 0:
     opt_values.remove(download_option[0])
     version = download_option[0][1].strip()
-    patch_folder = pathlib.Path() / version
-    json_file = pathlib.Path() / f"{version}.json"
     destination_path = (download_path / version).absolute()
 
     if download_manifests(destination_path):
@@ -54,11 +52,18 @@ if __name__ == '__main__':
     previous_files = os.listdir(download_path / str(previous_version))
 
     out_folder = base_path() / "out"
+    json_file = out_folder / f"{current_version}.json"
 
     # Clear out folder
     remove_file_or_dir(out_folder)
 
-    for depot in set.union(set(current_files), set(previous_files)):
+    # Prepare json content
+    json_content = {  "version": int(current_version),
+                      "date": 0,
+                      "changed_depots": [] }
+
+    # Iterate all depots that were present in previous version (Might be an issue if future version removes a depot)
+    for depot in previous_files:
       removed = []
       added = []
       modified = []
@@ -66,46 +71,30 @@ if __name__ == '__main__':
       current_path = download_path / str(current_version) / depot
       previous_path = download_path / str(previous_version) / depot
 
-      # Both exist, compare
-      if current_path.exists() and previous_path.exists():
-        current_manifest = read_manifest(current_path)
-        previous_manifest = read_manifest(previous_path)
+      # Read manifest files
+      current_manifest = read_manifest(current_path)
+      previous_manifest = read_manifest(previous_path)
 
-        current_set = set(current_manifest.files)
-        previous_set = set(previous_manifest.files)
+      # Initialize file sets
+      current_set = set(current_manifest.files)
+      previous_set = set(previous_manifest.files)
 
-        # Find all removed files (Result contains removed files and files with different hash)
-        diff_removed = list(previous_set.difference(current_set))
-        diff_removed_names = set([x[0] for x in diff_removed])
+      # Find all removed files (Result contains removed files and files with different hash)
+      diff_removed = list(previous_set.difference(current_set))
+      diff_removed_names = set([x[0] for x in diff_removed])
 
-        # Find all added files (Result contains added files and files with different hash)
-        diff_added = list(current_set.difference(previous_set))
-        diff_added_names = set([x[0] for x in diff_added])
-        
-        # Find all removed files (Remove files with same name but different hash)
-        removed = set.difference(diff_removed_names, diff_added_names)
+      # Find all added files (Result contains added files and files with different hash)
+      diff_added = list(current_set.difference(previous_set))
+      diff_added_names = set([x[0] for x in diff_added])
+      
+      # Find all removed files (Remove files with same name but different hash)
+      removed = set.difference(diff_removed_names, diff_added_names)
 
-        # Find all added files (Remove files with same name but different hash)
-        added = set.difference(diff_added_names, diff_removed_names)
+      # Find all added files (Remove files with same name but different hash)
+      added = set.difference(diff_added_names, diff_removed_names)
 
-        # Find all modified files (Retain files with same name but different hash)
-        modified = set.intersection(diff_removed_names, diff_added_names)
-
-        print("compare")
-
-      # Only the new one exists, all are added
-      elif current_path.exists():
-        manifest = read_manifest(current_path)
-        added = [x[0] for x in manifest.files]
-
-        print("added")
-
-      # Only the old one exists, all are removed
-      else:
-        manifest = read_manifest(previous_path)
-        removed = [x[0] for x in manifest.files]
-
-        print("removed")
+      # Find all modified files (Retain files with same name but different hash)
+      modified = set.intersection(diff_removed_names, diff_added_names)
 
       changes = []
 
@@ -121,3 +110,7 @@ if __name__ == '__main__':
 
       if len(changes) > 0:
         write_file(out_folder / depot, "\n".join(changes))
+        json_content["changed_depots"].append({"depot_id": int(previous_manifest.depot), "manifest_id": int(previous_manifest.id)})
+
+    # Write json files
+      write_json(json_file, json_content)
