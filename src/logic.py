@@ -2,6 +2,7 @@ import time
 import shutil
 from dataclasses import dataclass
 import re
+import os
 
 import pexpect
 import pexpect.popen_spawn
@@ -73,8 +74,8 @@ def download_manifest(manifest_id: int, depot_id: int, destination_path: pathlib
   args = ["-app", "813780",
           "-depot", str(depot_id),
           "-manifest", str(manifest_id),
-          "-username", "hellgameroriginal", 
-          "-password", "reinda8426", 
+          "-username", os.environ["USER"], 
+          "-password", os.environ["PASSWORD"], 
           "-remember-password",
           "-dir", str(destination_path),
           "-manifest-only"]
@@ -83,8 +84,8 @@ def download_manifest(manifest_id: int, depot_id: int, destination_path: pathlib
   
 def download_current_manifests(destination_path: pathlib.Path):
   args = ["-app", "813780",
-          "-username", "hellgameroriginal", 
-          "-password", "reinda8426", 
+          "-username", os.environ["USER"], 
+          "-password", os.environ["PASSWORD"], 
           "-remember-password",
           "-dir", str(destination_path),
           "-manifest-only"]
