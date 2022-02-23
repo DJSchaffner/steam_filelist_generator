@@ -35,7 +35,7 @@ if __name__ == '__main__':
     version = download_option[0][1].strip()
     destination_path = (download_path / version).absolute()
 
-    if download_manifests(destination_path):
+    if download_current_manifests(download_path):
       # Remove depot downloader cache file
       remove_file_or_dir(destination_path / ".DepotDownloader")
 

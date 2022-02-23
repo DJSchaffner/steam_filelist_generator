@@ -19,26 +19,12 @@ class Manifest():
   size_compressed: int
   files: list
 
-def download_manifests(destination_path: pathlib.Path):
+def depot_downloader(options: list, destination_path: pathlib.Path):
   depot_downloader_path = str(resource_path("DepotDownloader/DepotDownloader.dll").absolute())
-  args = ["dotnet", str(depot_downloader_path), 
-          "-app", "813780",
-          "-username", "hellgameroriginal", 
-          "-password", "reinda8426", 
-          "-remember-password",
-          "-dir", str(destination_path),
-          "-manifest-only"]
 
-  # Make sure destination folder is empty
-  if destination_path.exists():
-    try:
-      shutil.rmtree(destination_path)
-    except BaseException:
-      print("Error removing previous download directory")
-      
-  destination_path.mkdir(parents=True)
-
-  # Spawn process and store in queue
+  args = ["dotnet", depot_downloader_path] + options
+  
+  # Spawn process
   p = pexpect.popen_spawn.PopenSpawn(" ".join(args), encoding="utf-8")
   p.logfile_read = sys.stdout
 
@@ -78,7 +64,32 @@ def download_manifests(destination_path: pathlib.Path):
   except ConnectionError as e:
     print(e)
 
+  # Remove depot downloader cache file
+  remove_file_or_dir(destination_path / ".DepotDownloader")
+
   return success
+
+def download_manifest(manifest_id: int, depot_id: int, destination_path: pathlib.Path):
+  args = ["-app", "813780",
+          "-depot", str(depot_id),
+          "-manifest", str(manifest_id),
+          "-username", "hellgameroriginal", 
+          "-password", "reinda8426", 
+          "-remember-password",
+          "-dir", str(destination_path),
+          "-manifest-only"]
+
+  return depot_downloader(args, destination_path)
+  
+def download_current_manifests(destination_path: pathlib.Path):
+  args = ["-app", "813780",
+          "-username", "hellgameroriginal", 
+          "-password", "reinda8426", 
+          "-remember-password",
+          "-dir", str(destination_path),
+          "-manifest-only"]
+
+  return depot_downloader(args, destination_path)
 
 def read_manifest(file: pathlib.Path):
   result = None
