@@ -21,96 +21,129 @@ if __name__ == '__main__':
   # Extract options from parameters
   opt_values, args = getopt(sys.argv[1:], "d:amr")
 
-  # After removing the options nothing should be left
-  if len(args) != 0:
-    print_usage()
-    sys.exit()
-
   #date = time.mktime(time.strptime(args[0], "%d %B %Y – %H:%M:%S %Z"))
   download_option = list(filter(lambda x: x[0] == "-d", opt_values))
   download_path = base_path() / "download"
+  patches_json_path = base_path() / "remote" / "patches.json"
 
+  # Make sure download path is empty and create it if necessary
+  remove_file_or_dir(download_path)
+  download_path.mkdir(parents=True)
+
+  # After download option has no addition parameter, other options require two
+  if len(download_option) == 0 and len(args) != 2:
+    print_usage()
+    sys.exit()
+
+  # Load patches json
+  with open(patches_json_path, "r") as f:
+    patches_json = json.load(f)
+
+  # Download option was chosen
   if len(download_option) > 0:
     opt_values.remove(download_option[0])
     version = download_option[0][1].strip()
-    destination_path = (download_path / version).absolute()
+    depots = []
 
     if download_current_manifests(download_path):
-      # Remove depot downloader cache file
-      remove_file_or_dir(destination_path / ".DepotDownloader")
-
       # Rename manifest files for later
-      for filename in os.listdir(destination_path):
-        depot = re.match(r'manifest_(\d+)_\d+\.txt', filename).groups()[0]
-        (destination_path / filename).rename(f"{destination_path}/{depot}.txt")
+      for filename in os.listdir(download_path):
+        # Extract depot and manifest id from downloaded file name
+        depot_id, manifest_id = re.match(r'manifest_(\d+)_(\d+)\.txt', filename).groups()[:2]
 
+        # Rename the file
+        (download_path / filename).rename(f"{download_path}/{depot_id}.txt")
+
+        # Add current depot to depot list
+        depots.append({"depot_id": int(depot_id), "manifest_id": int(manifest_id)})
+
+    # Add new patch to json file and write it
+    patches_json["patches"].append({"version": int(version), "date": 0, "depots": depots})
+    write_json(patches_json_path, patches_json)
+
+  # List option was chosen
   if len(opt_values) > 0:
-    current_version = 59165
-    previous_version = 58850
+    current_version = int(args[0])
+    target_version = int(args[1])
 
-    current_files = os.listdir(download_path / str(current_version))
-    previous_files = os.listdir(download_path / str(previous_version))
+    filtered_patches = list(filter(lambda x: x["version"] == current_version or x["version"] == target_version, patches_json["patches"]))
 
-    out_folder = base_path() / "out"
-    json_file = out_folder / f"{current_version}.json"
+    if len(filtered_patches) != 2:
+      print("At least one patch is not documented or ambigous!")
+      sys.exit()
+
+    current_patch = list(filter(lambda x: x["version"] == current_version, filtered_patches))[0]
+    target_patch = list(filter(lambda x: x["version"] == target_version, filtered_patches))[0]
+
+    out_path = base_path() / "out"
+    json_file = out_path / f"{current_version}.json"
 
     # Clear out folder
-    remove_file_or_dir(out_folder)
+    remove_file_or_dir(out_path)
 
     # Prepare json content
     json_content = {  "version": int(current_version),
                       "date": 0,
                       "changed_depots": [] }
 
-    # Iterate all depots that were present in previous version (Might be an issue if future version removes a depot)
-    for depot in previous_files:
-      removed = []
-      added = []
-      modified = []
+    # Iterate all depots that were present in target version (Might be an issue if future version removes a depot)
+    for current_depot, target_depot in zip(current_patch["depots"], target_patch["depots"]):
+      depot_id = current_depot["depot_id"]
+      current_manifest_id = current_depot["manifest_id"]
+      target_manifest_id = target_depot["manifest_id"]
 
-      current_path = download_path / str(current_version) / depot
-      previous_path = download_path / str(previous_version) / depot
+      # Only need to check for changes if manifest changed
+      if current_manifest_id != target_manifest_id:
+        removed = []
+        added = []
+        modified = []
 
-      # Read manifest files
-      current_manifest = read_manifest(current_path)
-      previous_manifest = read_manifest(previous_path)
+        # Download manifests
+        download_manifest(current_manifest_id, depot_id, download_path)
+        download_manifest(target_manifest_id, depot_id, download_path)
 
-      # Initialize file sets
-      current_set = set(current_manifest.files)
-      previous_set = set(previous_manifest.files)
+        # Read manifest files
+        current_manifest = read_manifest(download_path / f"manifest_{depot_id}_{current_manifest_id}.txt")
+        target_manifest = read_manifest(download_path / f"manifest_{depot_id}_{target_manifest_id}.txt")
 
-      # Find all removed files (Result contains removed files and files with different hash)
-      diff_removed = list(previous_set.difference(current_set))
-      diff_removed_names = set([x[0] for x in diff_removed])
+        # Initialize file sets
+        current_set = set(current_manifest.files)
+        target_set = set(target_manifest.files)
 
-      # Find all added files (Result contains added files and files with different hash)
-      diff_added = list(current_set.difference(previous_set))
-      diff_added_names = set([x[0] for x in diff_added])
-      
-      # Find all removed files (Remove files with same name but different hash)
-      removed = set.difference(diff_removed_names, diff_added_names)
+        # Find all removed files (Result contains removed files and files with different hash)
+        diff_removed = list(target_set.difference(current_set))
+        diff_removed_names = set([x[0] for x in diff_removed])
 
-      # Find all added files (Remove files with same name but different hash)
-      added = set.difference(diff_added_names, diff_removed_names)
+        # Find all added files (Result contains added files and files with different hash)
+        diff_added = list(current_set.difference(target_set))
+        diff_added_names = set([x[0] for x in diff_added])
+        
+        # Find all removed files (Remove files with same name but different hash)
+        removed = set.difference(diff_removed_names, diff_added_names)
 
-      # Find all modified files (Retain files with same name but different hash)
-      modified = set.intersection(diff_removed_names, diff_added_names)
+        # Find all added files (Remove files with same name but different hash)
+        added = set.difference(diff_added_names, diff_removed_names)
 
-      changes = []
+        # Find all modified files (Retain files with same name but different hash)
+        modified = set.intersection(diff_removed_names, diff_added_names)
 
-      for opt, _ in opt_values:
-        if opt == "-a":
-          changes += added
+        changes = []
 
-        if opt == "-r":
-          changes += removed
+        for opt, _ in opt_values:
+          if opt == "-a":
+            changes += added
 
-        if opt == "-m":
-          changes += modified
+          if opt == "-r":
+            changes += removed
 
-      if len(changes) > 0:
-        write_file(out_folder / depot, "\n".join(changes))
-        json_content["changed_depots"].append({"depot_id": int(previous_manifest.depot), "manifest_id": int(previous_manifest.id)})
+          if opt == "-m":
+            changes += modified
+
+        if len(changes) > 0:
+          write_file(out_path / f"{depot_id}.txt", "\n".join(changes))
+
+          # Add depot to json list
+          json_content["changed_depots"].append({"depot_id": int(target_manifest.depot), "manifest_id": int(target_manifest.id)})
 
     # Write json files
-      write_json(json_file, json_content)
+    write_json(json_file, json_content)
