@@ -45,8 +45,12 @@ def write_file(file_name: pathlib.Path, content: str):
     file.write(content)
 
 def write_json(file_name: pathlib.Path, content: dict):
+  # Remove file if it exists
   if file_name.exists():
     file_name.unlink()
+
+  # Create parent directory if it doesnt exist
+  file_name.parent.mkdir(parents=True, exist_ok=True)
 
   with file_name.open("x") as file:
     json.dump(content, file, indent=2)
