@@ -20,7 +20,7 @@ class Manifest():
   size_compressed: int
   files: list
 
-def depot_downloader(options: list, destination_path: pathlib.Path):
+def depot_downloader(options: list):
   depot_downloader_path = str(resource_path("DepotDownloader/DepotDownloader.dll").absolute())
 
   args = ["dotnet", depot_downloader_path] + options
@@ -65,9 +65,6 @@ def depot_downloader(options: list, destination_path: pathlib.Path):
   except ConnectionError as e:
     print(e)
 
-  # Remove depot downloader cache file
-  remove_file_or_dir(destination_path / ".DepotDownloader")
-
   return success
 
 def download_manifest(manifest_id: int, depot_id: int, destination_path: pathlib.Path):
@@ -80,7 +77,12 @@ def download_manifest(manifest_id: int, depot_id: int, destination_path: pathlib
           "-dir", str(destination_path),
           "-manifest-only"]
 
-  return depot_downloader(args, destination_path)
+  success = depot_downloader(args)
+
+  # Remove depot downloader cache folder
+  remove_file_or_dir(destination_path / ".DepotDownloader")
+
+  return success
   
 def download_current_manifests(destination_path: pathlib.Path):
   args = ["-app", "813780",
@@ -90,7 +92,12 @@ def download_current_manifests(destination_path: pathlib.Path):
           "-dir", str(destination_path),
           "-manifest-only"]
 
-  return depot_downloader(args, destination_path)
+  success = depot_downloader(args)
+
+  # Remove depot downloader cache folder
+  remove_file_or_dir(destination_path / ".DepotDownloader")
+
+  return success
 
 def read_manifest(file: pathlib.Path):
   result = None
