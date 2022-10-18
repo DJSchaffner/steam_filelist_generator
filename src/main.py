@@ -9,6 +9,9 @@ from getopt import getopt
 from utils import *
 from logic import *
 
+# DLC Depots
+DEPOT_BLACKLIST = [1389240, 1557210, 1869820]
+
 def print_usage():
   print("Usage: main.py [OPTIONS]\n" +
         "OPTIONS:\n" +
@@ -49,13 +52,15 @@ if __name__ == '__main__':
       # Rename manifest files for later
       for filename in os.listdir(download_path):
         # Extract depot and manifest id from downloaded file name
-        depot_id, manifest_id = re.match(r'manifest_(\d+)_(\d+)\.txt', filename).groups()[:2]
+        depot_id, manifest_id = map(int, re.match(r'manifest_(\d+)_(\d+)\.txt', filename).groups()[:2])
 
         # Rename the file
         (download_path / filename).rename(f"{download_path}/{depot_id}.txt")
 
-        # Add current depot to depot list
-        depots.append({"depot_id": int(depot_id), "manifest_id": int(manifest_id)})
+        # Ignore DLC Depots
+        if not depot_id in DEPOT_BLACKLIST:
+          # Add current depot to depot list
+          depots.append({"depot_id": depot_id, "manifest_id": manifest_id})
 
     # Add new patch to json file and write it
     patches_json["patches"].append({"version": int(version), "date": 0, "depots": depots})
