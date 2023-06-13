@@ -10,7 +10,7 @@ from utils import *
 from logic import *
 
 # DLC Depots
-DEPOT_BLACKLIST = [1389240, 1557210, 1869820]
+DEPOT_BLACKLIST = [228987, 228988, 228990, 1389240, 1557210, 1869820, 2141580]
 
 def print_usage():
   print("Usage: main.py [OPTIONS]\n" +
