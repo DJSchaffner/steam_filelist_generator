@@ -24,6 +24,7 @@ def depot_downloader(options: list):
   depot_downloader_path = str(resource_path("DepotDownloader/DepotDownloader.dll").absolute())
 
   args = ["dotnet", depot_downloader_path] + options
+  success = False
   
   # Spawn process
   p = pexpect.popen_spawn.PopenSpawn(" ".join(args), encoding="utf-8")
@@ -88,6 +89,7 @@ def download_current_manifests(destination_path: pathlib.Path):
   args = ["-app", "813780",
           "-username", os.environ["USER"], 
           "-password", os.environ["PASSWORD"], 
+          "-beta", "public",
           "-remember-password",
           "-dir", str(destination_path),
           "-manifest-only"]
