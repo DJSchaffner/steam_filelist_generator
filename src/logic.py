@@ -38,7 +38,7 @@ def depot_downloader(options: list):
     ]
 
     # Default timeout in seconds
-    timeout = 15
+    timeout = 30
     response = p.expect(responses, timeout=timeout)
 
     # Success
